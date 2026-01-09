@@ -2054,6 +2054,59 @@ public:
 	dict<RTLIL::IdString, RTLIL::Wire*> wires_;
 	dict<RTLIL::IdString, RTLIL::Cell*> cells_;
 
+	// ============================================================
+	// ZYPHAR MODULE EXTENSIONS - Design-Level Optimization
+	// ============================================================
+
+	// Global design metrics (ML-predicted, updated incrementally)
+	struct ZypharDesignMetrics {
+		float total_area_um2 = 0.0f;
+		float critical_path_ps = 0.0f;
+		float total_power_mw = 0.0f;
+		float routability_score = 0.0f;    // [0,1] - 1 is easily routable
+		int estimated_drc_violations = 0;
+		float confidence = 0.0f;
+	} zyphar_metrics;
+
+	// Timing graph for differentiable STA
+	struct ZypharTimingNode {
+		RTLIL::Cell* cell;
+		float arrival_time = 0.0f;
+		float required_time = 0.0f;
+		float slack = 0.0f;
+		float d_slack_d_delay = 0.0f;      // Gradient for optimization
+	};
+	std::vector<ZypharTimingNode> zyphar_timing_graph;
+
+	// Critical paths (auto-detected or user-specified)
+	struct ZypharCriticalPath {
+		std::vector<RTLIL::Cell*> cells;
+		float path_delay_ps = 0.0f;
+		float slack_ps = 0.0f;
+		RTLIL::IdString startpoint;
+		RTLIL::IdString endpoint;
+	};
+	std::vector<ZypharCriticalPath> zyphar_critical_paths;
+
+	// Optimization state
+	struct ZypharOptState {
+		int iteration = 0;
+		float current_cost = 0.0f;
+		float best_cost = 0.0f;
+		float learning_rate = 0.001f;
+		bool converged = false;
+	} zyphar_opt;
+
+	// Bidirectional link to physical design
+	void* zyphar_physical_block_ptr = nullptr;  // Pointer to OpenROAD dbBlock
+
+	// Zyphar optimization methods
+	void zyphar_build_timing_graph();
+	void zyphar_compute_gradients();
+	void zyphar_optimization_step();
+	float zyphar_compute_cost();  // Weighted sum of area, timing, power
+	// ============================================================
+
 	std::vector<RTLIL::SigSig>   connections_;
 	std::vector<RTLIL::Binding*> bindings_;
 
@@ -2486,6 +2539,46 @@ public:
 	RTLIL::IdString type;
 	dict<RTLIL::IdString, RTLIL::SigSpec> connections_;
 	dict<RTLIL::IdString, RTLIL::Const> parameters;
+
+	// ============================================================
+	// ZYPHAR EXTENSIONS - Unified IR for Next-Gen EDA
+	// ============================================================
+
+	// Physical predictions from ML models (updated during synthesis)
+	struct ZypharPhysicalHint {
+		float estimated_delay_ps = 0.0f;    // Predicted delay in picoseconds
+		float estimated_area_um2 = 0.0f;    // Predicted area in um^2
+		float estimated_power_uw = 0.0f;    // Predicted power in microwatts
+		float placement_x_hint = -1.0f;     // Suggested X coordinate (-1 = no hint)
+		float placement_y_hint = -1.0f;     // Suggested Y coordinate (-1 = no hint)
+		float confidence = 0.0f;            // ML model confidence [0,1]
+	} zyphar_physical;
+
+	// Intent preservation - what the designer wanted (survives all transforms)
+	struct ZypharIntent {
+		RTLIL::IdString purpose;            // "critical_path", "clock_domain", "reset", "datapath"
+		int priority = 0;                   // User-specified importance (higher = more important)
+		bool is_timing_critical = false;    // Explicitly marked critical
+		bool preserve_structure = false;    // Don't optimize away
+		dict<RTLIL::IdString, RTLIL::Const> user_constraints;  // Arbitrary user metadata
+	} zyphar_intent;
+
+	// Gradient information for differentiable optimization
+	struct ZypharGradient {
+		float d_cost_d_size = 0.0f;         // Gradient w.r.t. cell sizing
+		float d_cost_d_vt = 0.0f;           // Gradient w.r.t. threshold voltage
+		float d_timing_d_placement = 0.0f;  // How placement affects timing
+		bool needs_update = false;          // Flag for optimizer
+	} zyphar_grad;
+
+	// Bidirectional link to physical representation (set during P&R)
+	void* zyphar_physical_inst_ptr = nullptr;  // Pointer to OpenROAD dbInst
+
+	// Zyphar helper methods
+	bool has_physical_hint() const { return zyphar_physical.confidence > 0.0f; }
+	bool is_critical() const { return zyphar_intent.is_timing_critical || zyphar_intent.priority > 5; }
+	void propagate_gradient(float upstream_grad);  // For backprop
+	// ============================================================
 
 	// access cell ports
 	bool hasPort(RTLIL::IdString portname) const;

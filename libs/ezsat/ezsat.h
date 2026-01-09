@@ -20,12 +20,12 @@
 #ifndef EZSAT_H
 #define EZSAT_H
 
-#include <set>
 #include <map>
-#include <vector>
-#include <string>
-#include <stdio.h>
+#include <set>
 #include <stdint.h>
+#include <stdio.h>
+#include <string>
+#include <vector>
 
 class ezSAT
 {
@@ -40,15 +40,13 @@ class ezSAT
 	// negative numbers are non-literal expressions. each expression is represented
 	// by an operator id and a list of expressions (literals or non-literals).
 
-public:
-	enum OpId {
-		OpNot, OpAnd, OpOr, OpXor, OpIFF, OpITE
-	};
+      public:
+	enum OpId { OpNot, OpAnd, OpOr, OpXor, OpIFF, OpITE };
 
 	static const int CONST_TRUE;
 	static const int CONST_FALSE;
 
-private:
+      private:
 	bool flag_keep_cnf;
 	bool flag_non_incremental;
 
@@ -73,10 +71,10 @@ private:
 	int bind_cnf_and(const std::vector<int> &args);
 	int bind_cnf_or(const std::vector<int> &args);
 
-protected:
+      protected:
 	void preSolverCallback();
 
-public:
+      public:
 	int solverTimeout;
 	bool solverTimoutStatus;
 
@@ -122,40 +120,52 @@ public:
 
 	virtual bool solver(const std::vector<int> &modelExpressions, std::vector<bool> &modelValues, const std::vector<int> &assumptions);
 
-	bool solve(const std::vector<int> &modelExpressions, std::vector<bool> &modelValues, const std::vector<int> &assumptions) {
+	bool solve(const std::vector<int> &modelExpressions, std::vector<bool> &modelValues, const std::vector<int> &assumptions)
+	{
 		return solver(modelExpressions, modelValues, assumptions);
 	}
 
-	bool solve(const std::vector<int> &modelExpressions, std::vector<bool> &modelValues, int a = 0, int b = 0, int c = 0, int d = 0, int e = 0, int f = 0) {
+	bool solve(const std::vector<int> &modelExpressions, std::vector<bool> &modelValues, int a = 0, int b = 0, int c = 0, int d = 0, int e = 0,
+		   int f = 0)
+	{
 		std::vector<int> assumptions;
-		if (a != 0) assumptions.push_back(a);
-		if (b != 0) assumptions.push_back(b);
-		if (c != 0) assumptions.push_back(c);
-		if (d != 0) assumptions.push_back(d);
-		if (e != 0) assumptions.push_back(e);
-		if (f != 0) assumptions.push_back(f);
+		if (a != 0)
+			assumptions.push_back(a);
+		if (b != 0)
+			assumptions.push_back(b);
+		if (c != 0)
+			assumptions.push_back(c);
+		if (d != 0)
+			assumptions.push_back(d);
+		if (e != 0)
+			assumptions.push_back(e);
+		if (f != 0)
+			assumptions.push_back(f);
 		return solver(modelExpressions, modelValues, assumptions);
 	}
 
-	bool solve(int a = 0, int b = 0, int c = 0, int d = 0, int e = 0, int f = 0) {
+	bool solve(int a = 0, int b = 0, int c = 0, int d = 0, int e = 0, int f = 0)
+	{
 		std::vector<int> assumptions, modelExpressions;
 		std::vector<bool> modelValues;
-		if (a != 0) assumptions.push_back(a);
-		if (b != 0) assumptions.push_back(b);
-		if (c != 0) assumptions.push_back(c);
-		if (d != 0) assumptions.push_back(d);
-		if (e != 0) assumptions.push_back(e);
-		if (f != 0) assumptions.push_back(f);
+		if (a != 0)
+			assumptions.push_back(a);
+		if (b != 0)
+			assumptions.push_back(b);
+		if (c != 0)
+			assumptions.push_back(c);
+		if (d != 0)
+			assumptions.push_back(d);
+		if (e != 0)
+			assumptions.push_back(e);
+		if (f != 0)
+			assumptions.push_back(f);
 		return solver(modelExpressions, modelValues, assumptions);
 	}
 
-	void setSolverTimeout(int newTimeoutSeconds) {
-		solverTimeout = newTimeoutSeconds;
-	}
+	void setSolverTimeout(int newTimeoutSeconds) { solverTimeout = newTimeoutSeconds; }
 
-	bool getSolverTimoutStatus() {
-		return solverTimoutStatus;
-	}
+	bool getSolverTimoutStatus() { return solverTimoutStatus; }
 
 	// manage CNF (usually only accessed by SAT solvers)
 
@@ -184,47 +194,44 @@ public:
 	struct _V {
 		int id;
 		std::string name;
-		_V(int id) : id(id) { }
-		_V(const char *name) : id(0), name(name) { }
-		_V(const std::string &name) : id(0), name(name) { }
-		int get(ezSAT *that) {
+		_V(int id) : id(id) {}
+		_V(const char *name) : id(0), name(name) {}
+		_V(const std::string &name) : id(0), name(name) {}
+		int get(ezSAT *that)
+		{
 			if (name.empty())
 				return id;
 			return that->frozen_literal(name);
 		}
 	};
 
-	int VAR(_V a) {
-		return a.get(this);
-	}
+	int VAR(_V a) { return a.get(this); }
 
-	int NOT(_V a) {
-		return expression(OpNot, a.get(this));
-	}
+	int NOT(_V a) { return expression(OpNot, a.get(this)); }
 
-	int AND(_V a = 0, _V b = 0, _V c = 0, _V d = 0, _V e = 0, _V f = 0) {
+	int AND(_V a = 0, _V b = 0, _V c = 0, _V d = 0, _V e = 0, _V f = 0)
+	{
 		return expression(OpAnd, a.get(this), b.get(this), c.get(this), d.get(this), e.get(this), f.get(this));
 	}
 
-	int OR(_V a = 0, _V b = 0, _V c = 0, _V d = 0, _V e = 0, _V f = 0) {
+	int OR(_V a = 0, _V b = 0, _V c = 0, _V d = 0, _V e = 0, _V f = 0)
+	{
 		return expression(OpOr, a.get(this), b.get(this), c.get(this), d.get(this), e.get(this), f.get(this));
 	}
 
-	int XOR(_V a = 0, _V b = 0, _V c = 0, _V d = 0, _V e = 0, _V f = 0) {
+	int XOR(_V a = 0, _V b = 0, _V c = 0, _V d = 0, _V e = 0, _V f = 0)
+	{
 		return expression(OpXor, a.get(this), b.get(this), c.get(this), d.get(this), e.get(this), f.get(this));
 	}
 
-	int IFF(_V a, _V b = 0, _V c = 0, _V d = 0, _V e = 0, _V f = 0) {
+	int IFF(_V a, _V b = 0, _V c = 0, _V d = 0, _V e = 0, _V f = 0)
+	{
 		return expression(OpIFF, a.get(this), b.get(this), c.get(this), d.get(this), e.get(this), f.get(this));
 	}
 
-	int ITE(_V a, _V b, _V c) {
-		return expression(OpITE, a.get(this), b.get(this), c.get(this));
-	}
+	int ITE(_V a, _V b, _V c) { return expression(OpITE, a.get(this), b.get(this), c.get(this)); }
 
-	void SET(_V a, _V b) {
-		assume(IFF(a.get(this), b.get(this)));
-	}
+	void SET(_V a, _V b) { assume(IFF(a.get(this), b.get(this))); }
 
 	// simple helpers for building expressions with bit vectors
 
@@ -271,15 +278,19 @@ public:
 	std::vector<int> vec_srr(const std::vector<int> &vec1, int shift) { return vec_srl(vec1, -shift); }
 
 	std::vector<int> vec_shift(const std::vector<int> &vec1, int shift, int extend_left, int extend_right);
-	std::vector<int> vec_shift_right(const std::vector<int> &vec1, const std::vector<int> &vec2, bool vec2_signed, int extend_left, int extend_right);
-	std::vector<int> vec_shift_left(const std::vector<int> &vec1, const std::vector<int> &vec2, bool vec2_signed, int extend_left, int extend_right);
+	std::vector<int> vec_shift_right(const std::vector<int> &vec1, const std::vector<int> &vec2, bool vec2_signed, int extend_left,
+					 int extend_right);
+	std::vector<int> vec_shift_left(const std::vector<int> &vec1, const std::vector<int> &vec2, bool vec2_signed, int extend_left,
+					int extend_right);
 
 	void vec_append(std::vector<int> &vec, const std::vector<int> &vec1) const;
 	void vec_append_signed(std::vector<int> &vec, const std::vector<int> &vec1, int64_t value);
 	void vec_append_unsigned(std::vector<int> &vec, const std::vector<int> &vec1, uint64_t value);
 
-	int64_t vec_model_get_signed(const std::vector<int> &modelExpressions, const std::vector<bool> &modelValues, const std::vector<int> &vec1) const;
-	uint64_t vec_model_get_unsigned(const std::vector<int> &modelExpressions, const std::vector<bool> &modelValues, const std::vector<int> &vec1) const;
+	int64_t vec_model_get_signed(const std::vector<int> &modelExpressions, const std::vector<bool> &modelValues,
+				     const std::vector<int> &vec1) const;
+	uint64_t vec_model_get_unsigned(const std::vector<int> &modelExpressions, const std::vector<bool> &modelValues,
+					const std::vector<int> &vec1) const;
 
 	int vec_reduce_and(const std::vector<int> &vec1);
 	int vec_reduce_or(const std::vector<int> &vec1);
@@ -307,51 +318,49 @@ public:
 
 // helper classes for using operator overloading when generating complex expressions
 
-struct ezSATbit
-{
+struct ezSATbit {
 	ezSAT &sat;
 	int id;
 
-	ezSATbit(ezSAT &sat, ezSAT::_V a) : sat(sat), id(sat.VAR(a)) { }
+	ezSATbit(ezSAT &sat, ezSAT::_V a) : sat(sat), id(sat.VAR(a)) {}
 
-	ezSATbit operator ~() { return ezSATbit(sat, sat.NOT(id)); }
-	ezSATbit operator &(const ezSATbit &other) { return ezSATbit(sat, sat.AND(id, other.id)); }
-	ezSATbit operator |(const ezSATbit &other) { return ezSATbit(sat, sat.OR(id, other.id)); }
-	ezSATbit operator ^(const ezSATbit &other) { return ezSATbit(sat, sat.XOR(id, other.id)); }
-	ezSATbit operator ==(const ezSATbit &other) { return ezSATbit(sat, sat.IFF(id, other.id)); }
-	ezSATbit operator !=(const ezSATbit &other) { return ezSATbit(sat, sat.NOT(sat.IFF(id, other.id))); }
+	ezSATbit operator~() { return ezSATbit(sat, sat.NOT(id)); }
+	ezSATbit operator&(const ezSATbit &other) { return ezSATbit(sat, sat.AND(id, other.id)); }
+	ezSATbit operator|(const ezSATbit &other) { return ezSATbit(sat, sat.OR(id, other.id)); }
+	ezSATbit operator^(const ezSATbit &other) { return ezSATbit(sat, sat.XOR(id, other.id)); }
+	ezSATbit operator==(const ezSATbit &other) { return ezSATbit(sat, sat.IFF(id, other.id)); }
+	ezSATbit operator!=(const ezSATbit &other) { return ezSATbit(sat, sat.NOT(sat.IFF(id, other.id))); }
 
 	operator int() const { return id; }
 	operator ezSAT::_V() const { return ezSAT::_V(id); }
 	operator std::vector<int>() const { return std::vector<int>(1, id); }
 };
 
-struct ezSATvec
-{
+struct ezSATvec {
 	ezSAT &sat;
 	std::vector<int> vec;
 
-	ezSATvec(ezSAT &sat, const std::vector<int> &vec) : sat(sat), vec(vec) { }
+	ezSATvec(ezSAT &sat, const std::vector<int> &vec) : sat(sat), vec(vec) {}
 
-	ezSATvec operator ~() { return ezSATvec(sat, sat.vec_not(vec)); }
-	ezSATvec operator -() { return ezSATvec(sat, sat.vec_neg(vec)); }
+	ezSATvec operator~() { return ezSATvec(sat, sat.vec_not(vec)); }
+	ezSATvec operator-() { return ezSATvec(sat, sat.vec_neg(vec)); }
 
-	ezSATvec operator &(const ezSATvec &other) { return ezSATvec(sat, sat.vec_and(vec, other.vec)); }
-	ezSATvec operator |(const ezSATvec &other) { return ezSATvec(sat, sat.vec_or(vec, other.vec)); }
-	ezSATvec operator ^(const ezSATvec &other) { return ezSATvec(sat, sat.vec_xor(vec, other.vec)); }
+	ezSATvec operator&(const ezSATvec &other) { return ezSATvec(sat, sat.vec_and(vec, other.vec)); }
+	ezSATvec operator|(const ezSATvec &other) { return ezSATvec(sat, sat.vec_or(vec, other.vec)); }
+	ezSATvec operator^(const ezSATvec &other) { return ezSATvec(sat, sat.vec_xor(vec, other.vec)); }
 
-	ezSATvec operator +(const ezSATvec &other) { return ezSATvec(sat, sat.vec_add(vec, other.vec)); }
-	ezSATvec operator -(const ezSATvec &other) { return ezSATvec(sat, sat.vec_sub(vec, other.vec)); }
+	ezSATvec operator+(const ezSATvec &other) { return ezSATvec(sat, sat.vec_add(vec, other.vec)); }
+	ezSATvec operator-(const ezSATvec &other) { return ezSATvec(sat, sat.vec_sub(vec, other.vec)); }
 
-	ezSATbit operator < (const ezSATvec &other) { return ezSATbit(sat, sat.vec_lt_unsigned(vec, other.vec)); }
-	ezSATbit operator <=(const ezSATvec &other) { return ezSATbit(sat, sat.vec_le_unsigned(vec, other.vec)); }
-	ezSATbit operator ==(const ezSATvec &other) { return ezSATbit(sat, sat.vec_eq(vec, other.vec)); }
-	ezSATbit operator !=(const ezSATvec &other) { return ezSATbit(sat, sat.vec_ne(vec, other.vec)); }
-	ezSATbit operator >=(const ezSATvec &other) { return ezSATbit(sat, sat.vec_ge_unsigned(vec, other.vec)); }
-	ezSATbit operator > (const ezSATvec &other) { return ezSATbit(sat, sat.vec_gt_unsigned(vec, other.vec)); }
+	ezSATbit operator<(const ezSATvec &other) { return ezSATbit(sat, sat.vec_lt_unsigned(vec, other.vec)); }
+	ezSATbit operator<=(const ezSATvec &other) { return ezSATbit(sat, sat.vec_le_unsigned(vec, other.vec)); }
+	ezSATbit operator==(const ezSATvec &other) { return ezSATbit(sat, sat.vec_eq(vec, other.vec)); }
+	ezSATbit operator!=(const ezSATvec &other) { return ezSATbit(sat, sat.vec_ne(vec, other.vec)); }
+	ezSATbit operator>=(const ezSATvec &other) { return ezSATbit(sat, sat.vec_ge_unsigned(vec, other.vec)); }
+	ezSATbit operator>(const ezSATvec &other) { return ezSATbit(sat, sat.vec_gt_unsigned(vec, other.vec)); }
 
-	ezSATvec operator <<(int shift) { return ezSATvec(sat, sat.vec_shl(vec, shift)); }
-	ezSATvec operator >>(int shift) { return ezSATvec(sat, sat.vec_shr(vec, shift)); }
+	ezSATvec operator<<(int shift) { return ezSATvec(sat, sat.vec_shl(vec, shift)); }
+	ezSATvec operator>>(int shift) { return ezSATvec(sat, sat.vec_shr(vec, shift)); }
 
 	operator std::vector<int>() const { return vec; }
 };
