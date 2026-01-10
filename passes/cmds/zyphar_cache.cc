@@ -43,6 +43,18 @@ struct ZypharCachePass : public Pass {
         log("    -restore <module>\n");
         log("        Restore module from cache (if available)\n");
         log("\n");
+        log("    -max_entries <n>\n");
+        log("        Set maximum number of cache entries (default: 1000)\n");
+        log("\n");
+        log("    -max_size <mb>\n");
+        log("        Set maximum cache size in megabytes (default: 500)\n");
+        log("\n");
+        log("    -max_age <days>\n");
+        log("        Set maximum cache entry age in days (default: 30)\n");
+        log("\n");
+        log("    -evict\n");
+        log("        Force cache eviction based on current limits\n");
+        log("\n");
     }
 
     void execute(std::vector<std::string> args, RTLIL::Design *design) override
@@ -54,11 +66,15 @@ struct ZypharCachePass : public Pass {
         bool do_list = false;
         bool do_clear = false;
         bool do_save = false;
+        bool do_evict = false;
         std::string init_dir;
         std::string invalidate_module;
         std::string store_module;
         std::string store_pass_seq;
         std::string restore_module;
+        int max_entries = -1;
+        int max_size_mb = -1;
+        int max_age_days = -1;
 
         size_t argidx;
         for (argidx = 1; argidx < args.size(); argidx++) {
@@ -98,6 +114,22 @@ struct ZypharCachePass : public Pass {
                 restore_module = args[++argidx];
                 continue;
             }
+            if (args[argidx] == "-max_entries" && argidx + 1 < args.size()) {
+                max_entries = std::stoi(args[++argidx]);
+                continue;
+            }
+            if (args[argidx] == "-max_size" && argidx + 1 < args.size()) {
+                max_size_mb = std::stoi(args[++argidx]);
+                continue;
+            }
+            if (args[argidx] == "-max_age" && argidx + 1 < args.size()) {
+                max_age_days = std::stoi(args[++argidx]);
+                continue;
+            }
+            if (args[argidx] == "-evict") {
+                do_evict = true;
+                continue;
+            }
             break;
         }
         extra_args(args, argidx, design);
@@ -118,11 +150,34 @@ struct ZypharCachePass : public Pass {
         }
 
         if (!zyphar_cache.is_initialized()) {
-            if (do_status || do_list || do_clear || do_save ||
-                !invalidate_module.empty() || !store_module.empty() || !restore_module.empty()) {
+            if (do_status || do_list || do_clear || do_save || do_evict ||
+                !invalidate_module.empty() || !store_module.empty() || !restore_module.empty() ||
+                max_entries >= 0 || max_size_mb >= 0 || max_age_days >= 0) {
                 log_error("Cache not initialized. Use -init first.\n");
             }
             return;
+        }
+
+        // Configure cache limits
+        if (max_entries >= 0) {
+            zyphar_cache.set_max_entries(static_cast<size_t>(max_entries));
+            log("Set max cache entries to %d\n", max_entries);
+        }
+        if (max_size_mb >= 0) {
+            zyphar_cache.set_max_size_bytes(static_cast<size_t>(max_size_mb) * 1024 * 1024);
+            log("Set max cache size to %d MB\n", max_size_mb);
+        }
+        if (max_age_days >= 0) {
+            zyphar_cache.set_max_age_days(max_age_days);
+            log("Set max cache age to %d days\n", max_age_days);
+        }
+
+        if (do_evict) {
+            log("Running cache eviction...\n");
+            size_t before = zyphar_cache.entry_count();
+            zyphar_cache.evict_if_needed();
+            size_t after = zyphar_cache.entry_count();
+            log("Eviction complete: %zu -> %zu entries\n", before, after);
         }
 
         if (do_clear) {

@@ -62,6 +62,9 @@ public:
     // Get number of modules
     size_t module_count() const { return dependencies_.size(); }
 
+    // Get all dependents map (for conservative invalidation)
+    std::map<std::string, std::set<std::string>> get_all_dependents() const;
+
     // Debug: print the graph
     void log_graph() const;
 

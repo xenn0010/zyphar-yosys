@@ -16,8 +16,18 @@ ZypharChangeMonitor::ZypharChangeMonitor()
 
 ZypharChangeMonitor::~ZypharChangeMonitor()
 {
+    // Safety: only detach if design is still valid
+    // The design might already be destroyed during program exit
     if (design_) {
-        detach();
+        try {
+            // Check if design's monitors set still contains us
+            if (design_->monitors.count(this) > 0) {
+                design_->monitors.erase(this);
+            }
+        } catch (...) {
+            // Silently ignore - design may be in invalid state during shutdown
+        }
+        design_ = nullptr;
     }
 }
 

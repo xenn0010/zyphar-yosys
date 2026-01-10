@@ -52,13 +52,38 @@ struct ZypharWatchPass : public Pass {
         log("\n");
     }
 
-    // Get file modification time
+    // Get file modification time, returns 0 if file doesn't exist
     time_t get_mtime(const std::string &path) {
         struct stat st;
         if (stat(path.c_str(), &st) == 0) {
             return st.st_mtime;
         }
         return 0;
+    }
+
+    // Check if file exists and is readable
+    bool file_exists(const std::string &path) {
+        struct stat st;
+        return stat(path.c_str(), &st) == 0;
+    }
+
+    // Safe file read with error handling
+    bool safe_read_verilog(RTLIL::Design *design, const std::string &file) {
+        if (!file_exists(file)) {
+            log_warning("File not found: %s\n", file.c_str());
+            return false;
+        }
+
+        try {
+            Pass::call(design, "read_verilog " + file);
+            return true;
+        } catch (const std::exception &e) {
+            log_warning("Failed to read %s: %s\n", file.c_str(), e.what());
+            return false;
+        } catch (...) {
+            log_warning("Failed to read %s: unknown error\n", file.c_str());
+            return false;
+        }
     }
 
     void execute(std::vector<std::string> args, RTLIL::Design *design) override
@@ -104,9 +129,12 @@ struct ZypharWatchPass : public Pass {
             zyphar_cache.init();
         }
 
-        // Track file modification times
+        // Track file modification times and validate files
         std::map<std::string, time_t> file_mtimes;
         for (auto &file : watch_files) {
+            if (!file_exists(file)) {
+                log_warning("File not found at start: %s\n", file.c_str());
+            }
             file_mtimes[file] = get_mtime(file);
             log("Watching: %s (mtime: %ld)\n", file.c_str(), file_mtimes[file]);
         }
@@ -122,15 +150,32 @@ struct ZypharWatchPass : public Pass {
         }
         log("Press Ctrl+C to stop.\n\n");
 
-        // Initial file read
+        // Initial file read with error handling
         log("Reading initial design...\n");
+        bool initial_read_ok = true;
         for (auto &file : watch_files) {
-            Pass::call(design, "read_verilog " + file);
+            if (!safe_read_verilog(design, file)) {
+                initial_read_ok = false;
+            }
         }
 
-        // Initial synthesis
-        log("Running initial synthesis...\n");
-        do_synthesis(design, watch_files, top_module);
+        if (design->modules().size() == 0) {
+            log_warning("No modules loaded. Check your Verilog files.\n");
+        }
+
+        // Initial synthesis (only if we have modules)
+        if (design->modules().size() > 0) {
+            log("Running initial synthesis...\n");
+            try {
+                do_synthesis(design, watch_files, top_module);
+            } catch (const std::exception &e) {
+                log_warning("Initial synthesis failed: %s\n", e.what());
+            } catch (...) {
+                log_warning("Initial synthesis failed: unknown error\n");
+            }
+        } else if (!initial_read_ok) {
+            log_warning("Waiting for valid Verilog files...\n");
+        }
 
         if (run_once) {
             log("One-shot mode, exiting.\n");
@@ -139,16 +184,32 @@ struct ZypharWatchPass : public Pass {
 
         // Watch loop
         int iteration = 0;
+        int consecutive_errors = 0;
+        const int max_consecutive_errors = 5;
+        const int debounce_ms = 100;  // Wait this long after detecting change for stability
+
         while (watch_running) {
             std::this_thread::sleep_for(std::chrono::milliseconds(poll_ms));
 
             // Check for changes
             bool changes = false;
             std::vector<std::string> changed_files;
+            std::vector<std::string> missing_files;
 
             for (auto &file : watch_files) {
                 time_t new_mtime = get_mtime(file);
-                if (new_mtime != file_mtimes[file]) {
+
+                // Track missing files
+                if (new_mtime == 0 && file_mtimes[file] != 0) {
+                    log("[%d] File deleted or inaccessible: %s\n", iteration + 1, file.c_str());
+                    missing_files.push_back(file);
+                    file_mtimes[file] = 0;
+                    changes = true;
+                    continue;
+                }
+
+                // Track modified files
+                if (new_mtime != file_mtimes[file] && new_mtime != 0) {
                     log("[%d] File changed: %s\n", ++iteration, file.c_str());
                     file_mtimes[file] = new_mtime;
                     changed_files.push_back(file);
@@ -157,23 +218,67 @@ struct ZypharWatchPass : public Pass {
             }
 
             if (changes) {
+                // Debounce: wait a bit for file to stabilize (editors do save-in-place)
+                std::this_thread::sleep_for(std::chrono::milliseconds(debounce_ms));
+
+                // Re-check if file changed again during debounce
+                bool stable = true;
+                for (auto &file : changed_files) {
+                    time_t current_mtime = get_mtime(file);
+                    if (current_mtime != file_mtimes[file]) {
+                        file_mtimes[file] = current_mtime;
+                        stable = false;
+                    }
+                }
+
+                if (!stable) {
+                    // File still changing, skip this iteration
+                    log("File still changing, waiting...\n");
+                    continue;
+                }
+
                 auto start = std::chrono::high_resolution_clock::now();
 
                 // Clear design and re-read
-                // Note: In a more sophisticated implementation, we'd only
-                // re-read changed files and merge with cached modules
                 log("Reloading design...\n");
                 design->selection_stack.clear();
-                for (auto mod : design->modules())
-                    design->remove(mod);
 
-                // Re-read all files
+                // Safely clear modules
+                std::vector<RTLIL::IdString> to_remove;
+                for (auto mod : design->modules())
+                    to_remove.push_back(mod->name);
+                for (auto &name : to_remove)
+                    design->remove(design->module(name));
+
+                // Re-read all files with error handling
+                bool read_ok = true;
                 for (auto &file : watch_files) {
-                    Pass::call(design, "read_verilog " + file);
+                    if (!safe_read_verilog(design, file)) {
+                        read_ok = false;
+                    }
                 }
 
-                // Run incremental synthesis
-                do_synthesis(design, changed_files, top_module);
+                if (!read_ok || design->modules().size() == 0) {
+                    consecutive_errors++;
+                    if (consecutive_errors >= max_consecutive_errors) {
+                        log_warning("Too many consecutive errors, consider fixing your files.\n");
+                        consecutive_errors = 0;  // Reset to avoid spam
+                    }
+                    continue;
+                }
+
+                consecutive_errors = 0;  // Reset on success
+
+                // Run incremental synthesis with error handling
+                try {
+                    do_synthesis(design, changed_files, top_module);
+                } catch (const std::exception &e) {
+                    log_warning("Synthesis failed: %s\n", e.what());
+                    continue;
+                } catch (...) {
+                    log_warning("Synthesis failed: unknown error\n");
+                    continue;
+                }
 
                 auto end = std::chrono::high_resolution_clock::now();
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

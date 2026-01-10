@@ -174,6 +174,21 @@ std::vector<RTLIL::IdString> ZypharDependencyGraph::get_reverse_topological_orde
     return order;
 }
 
+std::map<std::string, std::set<std::string>> ZypharDependencyGraph::get_all_dependents() const
+{
+    std::map<std::string, std::set<std::string>> result;
+
+    for (auto &pair : dependents_) {
+        std::set<std::string> deps_str;
+        for (auto &dep : pair.second) {
+            deps_str.insert(dep.str());
+        }
+        result[pair.first.str()] = deps_str;
+    }
+
+    return result;
+}
+
 std::string ZypharDependencyGraph::to_json() const
 {
     std::ostringstream json;
