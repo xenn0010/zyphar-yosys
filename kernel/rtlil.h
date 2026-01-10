@@ -2105,6 +2105,23 @@ public:
 	void zyphar_compute_gradients();
 	void zyphar_optimization_step();
 	float zyphar_compute_cost();  // Weighted sum of area, timing, power
+
+	// ============================================================
+	// ZYPHAR INCREMENTAL SYNTHESIS - Content Hashing
+	// ============================================================
+
+	// Content hash for change detection (lazy-computed)
+	mutable uint64_t zyphar_content_hash = 0;
+	mutable bool zyphar_hash_valid = false;
+
+	// Compute content hash (includes wires, cells, connections, parameters)
+	uint64_t get_content_hash() const;
+
+	// Invalidate hash (called when module is modified)
+	void invalidate_content_hash() { zyphar_hash_valid = false; }
+
+	// Check if module content matches a given hash
+	bool content_matches(uint64_t hash) const { return get_content_hash() == hash; }
 	// ============================================================
 
 	std::vector<RTLIL::SigSig>   connections_;

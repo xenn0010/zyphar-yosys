@@ -2859,6 +2859,88 @@ RTLIL::Module *RTLIL::Module::clone() const
 	return new_mod;
 }
 
+// Zyphar: Compute content hash for incremental synthesis
+uint64_t RTLIL::Module::get_content_hash() const
+{
+	if (zyphar_hash_valid)
+		return zyphar_content_hash;
+
+	// Use Yosys's built-in hasher (DJB2-based)
+	Hasher h;
+
+	// Hash module name
+	h.eat(name);
+
+	// Hash all wires (sorted for determinism)
+	std::vector<RTLIL::IdString> wire_names;
+	for (auto &it : wires_)
+		wire_names.push_back(it.first);
+	std::sort(wire_names.begin(), wire_names.end());
+
+	for (auto &wn : wire_names) {
+		auto *wire = wires_.at(wn);
+		h.eat(wire->name);
+		h.eat(wire->width);
+		h.eat(wire->start_offset);
+		h.eat(wire->port_id);
+		h.eat(wire->port_input);
+		h.eat(wire->port_output);
+		for (auto &attr : wire->attributes) {
+			h.eat(attr.first);
+			h.eat(attr.second);
+		}
+	}
+
+	// Hash all cells (sorted for determinism)
+	std::vector<RTLIL::IdString> cell_names;
+	for (auto &it : cells_)
+		cell_names.push_back(it.first);
+	std::sort(cell_names.begin(), cell_names.end());
+
+	for (auto &cn : cell_names) {
+		auto *cell = cells_.at(cn);
+		h.eat(cell->name);
+		h.eat(cell->type);
+		// Hash parameters
+		for (auto &param : cell->parameters) {
+			h.eat(param.first);
+			h.eat(param.second);
+		}
+		// Hash connections
+		for (auto &conn : cell->connections()) {
+			h.eat(conn.first);
+			h.eat(conn.second);
+		}
+		for (auto &attr : cell->attributes) {
+			h.eat(attr.first);
+			h.eat(attr.second);
+		}
+	}
+
+	// Hash connections
+	for (auto &conn : connections_) {
+		h.eat(conn.first);
+		h.eat(conn.second);
+	}
+
+	// Hash module attributes
+	for (auto &attr : attributes) {
+		h.eat(attr.first);
+		h.eat(attr.second);
+	}
+
+	// Hash parameters
+	for (auto &param : parameter_default_values) {
+		h.eat(param.first);
+		h.eat(param.second);
+	}
+
+	// Store and return
+	zyphar_content_hash = h.yield();
+	zyphar_hash_valid = true;
+	return zyphar_content_hash;
+}
+
 bool RTLIL::Module::has_memories() const
 {
 	return !memories.empty();
@@ -2954,6 +3036,7 @@ void RTLIL::Module::add(RTLIL::Wire *wire)
 	log_assert(refcount_wires_ == 0);
 	wires_[wire->name] = wire;
 	wire->module = this;
+	invalidate_content_hash();  // Zyphar: track changes
 }
 
 void RTLIL::Module::add(RTLIL::Cell *cell)
@@ -2963,6 +3046,7 @@ void RTLIL::Module::add(RTLIL::Cell *cell)
 	log_assert(refcount_cells_ == 0);
 	cells_[cell->name] = cell;
 	cell->module = this;
+	invalidate_content_hash();  // Zyphar: track changes
 }
 
 void RTLIL::Module::add(RTLIL::Process *process)
@@ -2971,12 +3055,14 @@ void RTLIL::Module::add(RTLIL::Process *process)
 	log_assert(count_id(process->name) == 0);
 	processes[process->name] = process;
 	process->module = this;
+	invalidate_content_hash();  // Zyphar: track changes
 }
 
 void RTLIL::Module::add(RTLIL::Binding *binding)
 {
 	log_assert(binding != nullptr);
 	bindings_.push_back(binding);
+	invalidate_content_hash();  // Zyphar: track changes
 }
 
 void RTLIL::Module::remove(const pool<RTLIL::Wire*> &wires)
@@ -3020,6 +3106,7 @@ void RTLIL::Module::remove(const pool<RTLIL::Wire*> &wires)
 		wires_.erase(it->name);
 		delete it;
 	}
+	invalidate_content_hash();  // Zyphar: track changes
 }
 
 void RTLIL::Module::remove(RTLIL::Cell *cell)
@@ -3037,6 +3124,7 @@ void RTLIL::Module::remove(RTLIL::Cell *cell)
 	} else {
 		delete cell;
 	}
+	invalidate_content_hash();  // Zyphar: track changes
 }
 
 void RTLIL::Module::remove(RTLIL::Process *process)
@@ -3044,6 +3132,7 @@ void RTLIL::Module::remove(RTLIL::Process *process)
 	log_assert(processes.count(process->name) != 0);
 	processes.erase(process->name);
 	delete process;
+	invalidate_content_hash();  // Zyphar: track changes
 }
 
 void RTLIL::Module::rename(RTLIL::Wire *wire, RTLIL::IdString new_name)
@@ -3168,6 +3257,7 @@ void RTLIL::Module::connect(const RTLIL::SigSig &conn)
 
 	log_assert(GetSize(conn.first) == GetSize(conn.second));
 	connections_.push_back(conn);
+	invalidate_content_hash();  // Zyphar: track changes
 }
 
 void RTLIL::Module::connect(const RTLIL::SigSpec &lhs, const RTLIL::SigSpec &rhs)
@@ -3192,6 +3282,7 @@ void RTLIL::Module::new_connections(const std::vector<RTLIL::SigSig> &new_conn)
 	}
 
 	connections_ = new_conn;
+	invalidate_content_hash();  // Zyphar: track changes
 }
 
 const std::vector<RTLIL::SigSig> &RTLIL::Module::connections() const

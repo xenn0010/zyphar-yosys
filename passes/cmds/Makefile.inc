@@ -59,5 +59,11 @@ OBJS += passes/cmds/linecoverage.o
 OBJS += passes/cmds/sort.o
 OBJS += passes/cmds/icell_liberty.o
 OBJS += passes/cmds/zyphar_test.o
+OBJS += passes/cmds/zyphar_hash_test.o
+OBJS += passes/cmds/zyphar_deps.o
+OBJS += passes/cmds/zyphar_cache.o
+OBJS += passes/cmds/zyphar_monitor.o
+OBJS += passes/cmds/zyphar_synth.o
+OBJS += passes/cmds/zyphar_watch.o
 
 include $(YOSYS_SRC)/passes/cmds/sdc/Makefile.inc
