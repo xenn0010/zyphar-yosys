@@ -36,7 +36,7 @@ namespace VERILOG_FRONTEND {
 		std::shared_ptr<std::string> current_filename;
 		std::vector<std::shared_ptr<std::string>> fn_stack;
 		std::vector<int> ln_stack;
-		size_t LexerInput(char* buf, size_t max_size) override {
+		int LexerInput(char* buf, int max_size) override {
 			return readsome(*extra->lexin, buf, max_size);
 		}
 	};
