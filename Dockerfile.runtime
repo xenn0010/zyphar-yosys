@@ -1,0 +1,8 @@
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libreadline8t64 tcl libffi8 && rm -rf /var/lib/apt/lists/*
+WORKDIR /yosys
+COPY yosys yosys-abc ./
+COPY share ./share/
+ENV PATH="/yosys:$PATH"
+CMD ["yosys"]

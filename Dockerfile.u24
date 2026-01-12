@@ -1,0 +1,12 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends     build-essential clang bison flex libfl-dev     libreadline-dev gawk tcl-dev libffi-dev git     pkg-config python3 zlib1g-dev ca-certificates     && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /yosys
+RUN git clone --recurse-submodules --depth 1 https://github.com/xenn0010/zyphar-yosys.git .
+
+RUN make config-clang && make -j$(nproc)
+
+CMD ["./yosys"]
